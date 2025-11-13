@@ -1,36 +1,108 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Taiga Survival Simulation
+
+A comprehensive survival simulation game built with Next.js, featuring advanced AI, dynamic weather systems, seasons, inventory management, shelter building, and more.
+
+## Features
+
+- **Advanced AI Survivor**: Intelligent AI that makes decisions based on current conditions
+- **Dynamic Weather System**: Weather changes (sunny, rain, snow) affecting gameplay
+- **Seasonal Changes**: Four seasons (Spring, Summer, Autumn, Winter) with temperature variations
+- **Inventory Management**: Collect and craft items (wood, stone, food, fur, tools)
+- **Shelter Building**: Build and upgrade shelters for protection
+- **Mini-Map**: Real-time map overview
+- **Sound Effects**: Audio feedback for important events
+- **Achievements**: Unlock achievements based on survival milestones
+- **Pause/Fast Forward**: Control game speed
+- **Activity Log**: Detailed logging of all survivor actions
+- **Export Logs**: Save your survival logs to file
+
+## Game Mechanics
+
+### Survivor Stats
+- **Health**: Affected by warmth, hunger, and thirst
+- **Warmth**: Maintained by fire, shelter, and clothing
+- **Hunger**: Requires food collection and consumption
+- **Thirst**: Requires water collection and consumption
+
+### Resources
+- **Wood**: For building shelters and making fires
+- **Stone**: For shelter upgrades and tools
+- **Food**: Obtained through hunting and fishing
+- **Fur**: Used for crafting clothing and thread
+- **Water**: Essential for survival
+
+### Crafting System
+- **Thread**: Made from fur
+- **Fishing Rod**: Made from thread and stone
+- **Fur Coat**: Provides warmth bonus
+- **Spear**: Improves hunting success
+- **Traps**: Automatic food collection
+
+### Environmental Factors
+- **Temperature**: Varies by time of day and season
+- **Weather Events**: Random storms and weather changes
+- **Resource Regeneration**: Resources respawn over time
+- **Predator Threats**: Wolves and other dangers
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18+
+- npm or yarn
 
+### Installation
+
+1. Clone the repository:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone https://github.com/ridzidev/taiga-survival-nextjs.git
+cd taiga-survival-nextjs
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Install dependencies:
+```bash
+npm install
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+3. Run the development server:
+```bash
+npm run dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Learn More
+## How to Play
 
-To learn more about Next.js, take a look at the following resources:
+1. **Start Simulation**: Click "Mulai / Atur Ulang" to begin
+2. **Configure Parameters**: Adjust map size, resource counts, and AI intelligence
+3. **Watch the AI**: The survivor will automatically make decisions to survive
+4. **Monitor Stats**: Keep an eye on health, warmth, hunger, and thirst
+5. **Build Shelter**: Gather resources to build and upgrade shelter
+6. **Craft Tools**: Create fishing rods, spears, and traps for better survival
+7. **Manage Resources**: Balance resource gathering with consumption needs
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Controls
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **Pause**: Pause/resume the simulation
+- **Fast Forward**: Speed up time (2x speed)
+- **Export Log**: Save activity log to file
+- **Reset**: Start a new simulation
 
-## Deploy on Vercel
+## Technical Details
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Framework**: Next.js 16 with TypeScript
+- **Rendering**: Canvas-based 2D graphics
+- **Audio**: Web Audio API for sound effects
+- **State Management**: React hooks and component state
+- **Styling**: Inline CSS with retro terminal aesthetic
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Original Version
+
+This is a Next.js port of the original HTML/JavaScript version. The original `index.html` file is included for reference.
+
+## Contributing
+
+Feel free to submit issues and enhancement requests!
+
+## License
+
+This project is open source and available under the [MIT License](LICENSE).
