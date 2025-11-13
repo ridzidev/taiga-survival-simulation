@@ -54,7 +54,7 @@ A comprehensive survival simulation game built with Next.js, featuring advanced 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/ridzidev/taiga-survival-nextjs.git
+git clone https://github.com/ridzidev/taiga-survival.git
 cd taiga-survival-nextjs
 ```
 
