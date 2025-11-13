@@ -288,7 +288,7 @@ export default function SurvivalSimulation() {
     const logContainer = document.getElementById('activity-log') as HTMLDivElement;
     const TILE_SIZE = 14;
     const SHELTER_INTERIOR_SIZE = 20;
-    const COLORS = {
+    const COLORS: {[key: string]: string} = {
       SURVIVOR: '#ff4757',
       POHON: '#218c74',
       BATU: '#8395a7',
@@ -308,10 +308,10 @@ export default function SurvivalSimulation() {
     };
     let mapSize: number, mapHeight: number;
     let grid: string[][] = [];
-    let entities: any[] = [];
+    let entities: Entity[] = [];
     let survivor: any;
     let shelter: any = null;
-    let gameLoopInterval: number | null = null;
+    let gameLoopInterval: any = null;
     let globalTime = 0;
     let temperature = 15;
     let dayCycle = 0;
@@ -351,44 +351,50 @@ export default function SurvivalSimulation() {
         this.id = Math.random();
       }
       id: number;
+      update?: () => void;
+      lifespan?: number;
+      isIndoor?: boolean;
+      active?: boolean;
+      level?: number;
+      fire?: Fire | null;
     }
 
     class Fire extends Entity {
       constructor(x: number, y: number, public isIndoor = false) {
         super(x, y, 'API');
         this.lifespan = isIndoor ? 500 : 250;
+        this.update = () => {
+          this.lifespan--;
+          if (weather === 'hujan' && !this.isIndoor) this.lifespan -= 2;
+        };
       }
       lifespan: number;
-      update() {
-        this.lifespan--;
-        if (weather === 'hujan' && !this.isIndoor) this.lifespan -= 2;
-      }
     }
 
     class Animal extends Entity {
       constructor(x: number, y: number, type = 'HEWAN') {
         super(x, y, type);
-      }
-      update() {
-        if (Math.random() < (isDay ? 0.3 : 0.1)) {
-          const moveX = Math.floor(Math.random() * 3) - 1;
-          const moveY = Math.floor(Math.random() * 3) - 1;
-          if (this.isValidMove(this.x + moveX, this.y + moveY)) {
-            this.x += moveX;
-            this.y += moveY;
+        this.update = () => {
+          if (Math.random() < (isDay ? 0.3 : 0.1)) {
+            const moveX = Math.floor(Math.random() * 3) - 1;
+            const moveY = Math.floor(Math.random() * 3) - 1;
+            if (this.isValidMove(this.x + moveX, this.y + moveY)) {
+              this.x += moveX;
+              this.y += moveY;
+            }
           }
-        }
-        if (this.type === 'PREDATOR' && survivor && !inShelter && Math.abs(this.x - survivor.x) + Math.abs(this.y - survivor.y) <= 1 && Math.random() < 0.05) {
-          survivor.health -= survivor.inventory.spear ? 5 : 10;
-          logActivity('Binatang buas menyerang survivor!', true);
-        } else if (survivor && Math.abs(this.x - survivor.x) + Math.abs(this.y - survivor.y) < 5 && Math.random() < 0.2) {
-          const dx = Math.sign(this.x - survivor.x);
-          const dy = Math.sign(this.y - survivor.y);
-          if (this.isValidMove(this.x + dx, this.y + dy)) {
-            this.x += dx;
-            this.y += dy;
+          if (this.type === 'PREDATOR' && survivor && !inShelter && Math.abs(this.x - survivor.x) + Math.abs(this.y - survivor.y) <= 1 && Math.random() < 0.05) {
+            survivor.health -= survivor.inventory.spear ? 5 : 10;
+            logActivity('Binatang buas menyerang survivor!', true);
+          } else if (survivor && Math.abs(this.x - survivor.x) + Math.abs(this.y - survivor.y) < 5 && Math.random() < 0.2) {
+            const dx = Math.sign(this.x - survivor.x);
+            const dy = Math.sign(this.y - survivor.y);
+            if (this.isValidMove(this.x + dx, this.y + dy)) {
+              this.x += dx;
+              this.y += dy;
+            }
           }
-        }
+        };
       }
       isValidMove(x: number, y: number) {
         return x >= 0 && x < mapSize && y >= 0 && y < mapHeight && grid[y][x] !== 'AIR';
@@ -399,37 +405,34 @@ export default function SurvivalSimulation() {
       constructor(x: number, y: number) {
         super(x, y, 'TRAP');
         this.active = true;
+        this.update = () => {
+          if (this.active && Math.random() < 0.1) {
+            survivor.inventory.food += 1;
+            logActivity('Perangkap menangkap hewan! +1 makanan.');
+            this.active = false; // Need repair after catch
+          }
+        };
       }
       active: boolean;
-      update() {
-        if (this.active && Math.random() < 0.1) {
-          survivor.inventory.food += 1;
-          logActivity('Perangkap menangkap hewan! +1 makanan.');
-          this.active = false; // Need repair after catch
-        }
-      }
     }
 
-    class Shelter {
-      constructor(public x: number, public y: number) {
+    class Shelter extends Entity {
+      constructor(x: number, y: number) {
+        super(x, y, 'SHELTER');
         this.level = 1;
         this.fire = null;
-        this.type = 'SHELTER';
-        this.id = Math.random();
+        this.update = () => {
+          if (this.fire) {
+            this.fire.update();
+            if (this.fire.lifespan <= 0) {
+              this.fire = null;
+              logActivity('Api di shelter padam.');
+            }
+          }
+        };
       }
       level: number;
       fire: Fire | null;
-      type: string;
-      id: number;
-      update() {
-        if (this.fire) {
-          this.fire.update();
-          if (this.fire.lifespan <= 0) {
-            this.fire = null;
-            logActivity('Api di shelter padam.');
-          }
-        }
-      }
     }
 
     class Survivor extends Entity {
@@ -541,8 +544,8 @@ export default function SurvivalSimulation() {
         return closest;
       }
 
-      findNearestWater() {
-        let closestX = null, closestY = null;
+      findNearestWater(): {x: number, y: number} | null {
+        let closestX: number | null = null, closestY: number | null = null;
         let minDistance = Infinity;
         for (let y = 0; y < mapHeight; y++) {
           for (let x = 0; x < mapSize; x++) {
@@ -556,17 +559,21 @@ export default function SurvivalSimulation() {
             }
           }
         }
-        return {x: closestX, y: closestY};
+        if (closestX !== null && closestY !== null) {
+          return {x: closestX, y: closestY};
+        }
+        return null;
       }
 
-      pathfind(target: any) {
-        if (!target) return null;
-        const queue = [{x: this.x, y: this.y, path: []}];
+      pathfind(target: any): {x: number, y: number} | null {
+        if (!target || typeof target !== 'object' || !('x' in target) || !('y' in target) || typeof target.x !== 'number' || typeof target.y !== 'number') return null;
+        const typedTarget = target as {x: number, y: number};
+        const queue: Array<{x: number, y: number, path: Array<{x: number, y: number}>}> = [{x: this.x, y: this.y, path: []}];
         const visited = new Set();
         visited.add(`${this.x},${this.y}`);
         while (queue.length > 0) {
           const {x, y, path} = queue.shift()!;
-          if (x === target.x && y === target.y) return path[0]; // Return first move
+          if (x === typedTarget.x && y === typedTarget.y) return path.length > 0 ? path[0] : null; // Return first move or null if already there
           const dirs = [[0,1],[1,0],[0,-1],[-1,0]];
           for (let [dx, dy] of dirs) {
             const nx = x + dx, ny = y + dy;
@@ -638,7 +645,7 @@ export default function SurvivalSimulation() {
             if (this.target) this.executeMoveAndAction('BATU', 'stone', 'menambang batu'); else this.wander();
             break;
           case 'memancing':
-            if (!this.target || this.target.type !== 'AIR') this.target = this.findNearestWater();
+            this.target = this.findNearestWater();
             if (this.target && Math.abs(this.x - this.target.x) <= 1 && Math.abs(this.y - this.target.y) <= 1) {
               if (Math.random() < 0.3) {
                 this.inventory.food += 2;
@@ -979,7 +986,7 @@ export default function SurvivalSimulation() {
         }
       }
 
-      entities.forEach(entity => {
+      entities.forEach((entity: Entity) => {
         if (entity.type === 'API') {
           const flicker = Math.random() > 0.5 ? COLORS.API : '#ffdd59';
           ctx.fillStyle = flicker;
@@ -1052,18 +1059,12 @@ export default function SurvivalSimulation() {
         survivor.updateAI();
 
         entities = entities.filter(e => {
+          if (typeof e.update === 'function') e.update();
           if (e.type === 'API') {
-            e.update();
-            if (e.lifespan <= 0) {
+            if (e.lifespan !== undefined && e.lifespan <= 0) {
               logActivity('Api unggun telah padam.');
               return false;
             }
-          } else if (e.type === 'HEWAN' || e.type === 'PREDATOR') {
-            e.update();
-          } else if (e.type === 'SHELTER') {
-            e.update();
-          } else if (e.type === 'TRAP') {
-            e.update();
           }
           return true;
         });
