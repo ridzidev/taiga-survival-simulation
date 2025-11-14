@@ -113,14 +113,22 @@ export default function SurvivalSimulation() {
     // Setup
     const canvas = document.getElementById("gameCanvas") as HTMLCanvasElement;
     const ctx = canvas.getContext("2d")!;
-    const shelterCanvas = document.getElementById("shelter-canvas") as HTMLCanvasElement;
+    const shelterCanvas = document.getElementById(
+      "shelter-canvas"
+    ) as HTMLCanvasElement;
     const shelterCtx = shelterCanvas.getContext("2d")!;
     const logContainer = document.getElementById("log") as HTMLDivElement;
-    
-    const startButton = document.getElementById("start-sim") as HTMLButtonElement;
-    const pauseButton = document.getElementById("pause-btn") as HTMLButtonElement;
+
+    const startButton = document.getElementById(
+      "start-sim"
+    ) as HTMLButtonElement;
+    const pauseButton = document.getElementById(
+      "pause-btn"
+    ) as HTMLButtonElement;
     const ffButton = document.getElementById("ff-btn") as HTMLButtonElement;
-    const exportButton = document.getElementById("export-log") as HTMLButtonElement;
+    const exportButton = document.getElementById(
+      "export-log"
+    ) as HTMLButtonElement;
     const TILE_SIZE = 12;
     const COLORS: { [key: string]: string } = {
       SURVIVOR: "#ff4757",
@@ -145,7 +153,9 @@ export default function SurvivalSimulation() {
       console.log("Survivor sprite loaded successfully");
     };
     survivorImg.onerror = () => {
-      console.warn(`Failed to load sprite from ${SPRITE_PATH}, using colored fallback`);
+      console.warn(
+        `Failed to load sprite from ${SPRITE_PATH}, using colored fallback`
+      );
     };
     survivorImg.src = SPRITE_PATH;
     let mapSize: number = 60,
@@ -193,7 +203,7 @@ export default function SurvivalSimulation() {
       entry.className = `log-entry ${isImportant ? "important" : ""}`;
       entry.textContent = `[D${survivalDays}] ${message}`;
       logContainer.appendChild(entry);
-      
+
       const entries = logContainer.querySelectorAll(".log-entry");
       if (entries.length > 8) entries[0].remove();
       logContainer.scrollTop = logContainer.scrollHeight;
@@ -371,195 +381,31 @@ export default function SurvivalSimulation() {
       updateAI() {
         if (this.health <= 0) return;
 
-        // New AI: maintain desired thresholds defined globally (DESIRED)
-        const needHealth = this.health < DESIRED.health;
-        const needWarmth = this.warmth < DESIRED.warmth;
-        const needHunger = this.hunger < DESIRED.hunger;
-        const needThirst = this.thirst < DESIRED.thirst;
-
-        // If we don't have a plan or it's been exhausted, build one
-        if (!this.plan || this.plan.length === 0) {
-          this.buildPlan();
-        }
-
-        // If we have a plan, execute next step
-        if (this.plan && this.plan.length > 0) {
-          const currentPlannedTask = this.plan[0];
-          this.planAdvance = false;
-          this.task = currentPlannedTask;
-          this.performTask();
-          // If performTask flagged progress, consume the step
-          if (this.planAdvance) this.plan.shift();
-          return;
-        }
-
-        // If it's night and we have a shelter, go back inside
+        // Malam hari + punya shelter = LANGSUNG PULANG, NGGAK USAH NGELUYUR!
         if (this.hasShelter && !isDay && !inShelter) {
           this.task = "pulang ke shelter";
           this.performTask();
           return;
         }
 
-        // When inside shelter, try to restore to desired thresholds using available inventory.
-        if (inShelter) {
-          if (needHealth && this.health < 95) {
-            this.task = "tidur";
-            this.performTask();
-            return;
-          }
-          if (needThirst) {
-            if (this.inventory.water > 0) {
-              this.task = "minum di shelter";
-              this.performTask();
-              return;
-            }
-            // leave to fetch water
-            inShelter = false;
-            canvas.style.display = "block";
-            shelterCanvas.style.display = "none";
-            logActivity("Survivor keluar dari shelter untuk mencari air.", true);
-            this.task = "ambil air";
-            this.performTask();
-            return;
-          }
-          if (needHunger) {
-            if (this.inventory.food > 0) {
-              this.task = "makan di shelter";
-              this.performTask();
-              return;
-            }
-            // leave to find food
-            inShelter = false;
-            canvas.style.display = "block";
-            shelterCanvas.style.display = "none";
-            logActivity("Survivor keluar dari shelter untuk mencari makanan.", true);
-            if (this.inventory.fishingrod > 0 && Math.random() < 0.7) this.task = "memancing";
-            else this.task = "berburu";
-            this.performTask();
-            return;
-          }
-          if (needWarmth) {
-            if (this.inventory.wood > 0 && (!shelter.fire || shelter.fire.lifespan < 100)) {
-              this.task = "membuat api di shelter";
-              this.performTask();
-              return;
-            }
-            // leave to collect wood
-            inShelter = false;
-            canvas.style.display = "block";
-            shelterCanvas.style.display = "none";
-            logActivity("Survivor keluar dari shelter untuk mencari kayu.", true);
-            this.task = "mencari kayu";
-            this.performTask();
-            return;
-          }
+        // Plan habis? Buat baru!
+        if (!this.plan || this.plan.length === 0) {
+          this.buildPlan();
+        }
 
-          // If inside and no immediate needs, follow normal shelter behaviors
-          if (this.inventory.food > 3 && Math.random() < 0.3) {
-            this.task = "memasak";
-          } else {
-            this.task = "istirahat";
-          }
+        // Eksekusi plan
+        if (this.plan.length > 0) {
+          this.task = this.plan[0];
+          this.planAdvance = false;
           this.performTask();
+          if (this.planAdvance) {
+            this.plan.shift(); // task selesai → lanjut ke berikutnya
+          }
           return;
         }
 
-        // Outside shelter: fallback to older logic if no plan
-        // Outside shelter: prioritize meeting thresholds by gathering or using inventory
-        if (needHealth) {
-          if (this.hasShelter) {
-            this.task = "pulang ke shelter";
-            this.performTask();
-            return;
-          } else if (this.hunger > 40) {
-            this.task = "tidur"; // try to rest
-            this.performTask();
-            return;
-          }
-        }
-
-        if (needThirst) {
-          if (this.inventory.water > 0) {
-            this.task = "minum";
-            this.performTask();
-            return;
-          }
-          this.task = "ambil air";
-          this.performTask();
-          return;
-        }
-
-        if (needHunger) {
-          if (this.inventory.food > 0) {
-            this.task = "makan";
-            this.performTask();
-            return;
-          }
-          if (this.inventory.fishingrod > 0 && Math.random() < 0.7) {
-            this.task = "memancing";
-            this.performTask();
-            return;
-          }
-          this.task = "berburu";
-          this.performTask();
-          return;
-        }
-
-        if (needWarmth) {
-          // Prefer building a shelter if we don't have one and have resources
-          if (!this.hasShelter) {
-            if (this.inventory.wood >= 10 && this.inventory.stone >= 5) {
-              this.task = "bangun shelter";
-              this.performTask();
-              return;
-            }
-            // If we can't build yet, prioritize collecting materials for shelter
-            if (this.inventory.wood < 10) {
-              this.task = "mencari kayu";
-              this.performTask();
-              return;
-            }
-            if (this.inventory.stone < 5) {
-              this.task = "mencari batu";
-              this.performTask();
-              return;
-            }
-          }
-
-          // If we have shelter or cannot complete building soon, try to make a fire (prefer indoor if possible)
-          if (this.inventory.wood > 0 && globalTime - this.lastFireTime > 20) {
-            this.task = this.hasShelter ? "membuat api di shelter" : "membuat api";
-            this.performTask();
-            return;
-          }
-
-          // Fallback: gather wood
-          this.task = "mencari kayu";
-          this.performTask();
-          return;
-        }
-
-        // If no urgent needs, follow resource balancing logic
-        if (!this.hasShelter && this.inventory.wood >= 10 && this.inventory.stone >= 5) {
-          this.task = "bangun shelter";
-          this.performTask();
-          return;
-        }
-
-        if (this.inventory.water < 2) {
-          this.task = "ambil air";
-        } else if (this.inventory.food < 5) {
-          if (this.inventory.fishingrod > 0 && Math.random() < 0.5) this.task = "memancing";
-          else this.task = "berburu";
-        } else if (this.inventory.wood < 10) {
-          this.task = "mencari kayu";
-        } else if (this.inventory.stone < 5) {
-          this.task = "mencari batu";
-        } else if (this.inventory.fur < 10) {
-          this.task = "berburu";
-        } else {
-          this.task = "mengembara";
-        }
+        // Fallback santai
+        this.task = inShelter ? "istirahat" : "mengembara";
         this.performTask();
       }
 
@@ -889,23 +735,27 @@ export default function SurvivalSimulation() {
             this.wander();
             break;
           case "istirahat":
-            // Various shelter activities with randomization
-            if (this.warmth < 50 && this.inventory.wood > 0 && (!shelter.fire || shelter.fire.lifespan < 50)) {
-              this.task = "membuat api di shelter"; // Priority: make fire if cold
-            } else if (this.hunger < 40 && this.inventory.food > 2) {
-              this.task = "makan di shelter"; // Eat if hungry
-            } else if (this.thirst < 40 && this.inventory.water > 1) {
-              this.task = "minum di shelter"; // Drink if thirsty
-            } else if (Math.random() < 0.4) {
-              this.task = "tidur"; // Sleep - restore health quickly
-            } else if (Math.random() < 0.3 && this.inventory.food > 3 && this.inventory.water > 1) {
-              this.task = "memasak"; // Cooking activity (prep food)
+            // Di dalam shelter = otomatis jaga diri sendiri
+            if (
+              this.warmth < 75 &&
+              this.inventory.wood > 0 &&
+              shelter &&
+              (!shelter.fire || shelter.fire.lifespan < 80)
+            ) {
+              this.task = "membuat api di shelter";
+            } else if (this.hunger < 75 && this.inventory.food > 0) {
+              this.task = "makan di shelter";
+            } else if (this.thirst < 75 && this.inventory.water > 0) {
+              this.task = "minum di shelter";
+            } else if (this.health < 90) {
+              this.task = "tidur";
+            } else if (Math.random() < 0.35 && this.inventory.food >= 3) {
+              this.task = "memasak";
             } else {
-              this.task = "bersantai"; // Relax/wander around
+              this.task = "bersantai";
             }
-            this.performTask();
+            this.performTask(); // eksekusi task baru (rekursif sekali, aman)
             break;
-            
           case "tidur":
             this.health = Math.min(100, this.health + 1.5);
             this.warmth = Math.min(100, this.warmth + 0.8);
@@ -914,7 +764,7 @@ export default function SurvivalSimulation() {
               this.task = "istirahat";
             }
             break;
-            
+
           case "makan di shelter":
             if (this.inventory.food > 0) {
               this.inventory.food--;
@@ -923,7 +773,7 @@ export default function SurvivalSimulation() {
               this.task = "istirahat";
             }
             break;
-            
+
           case "minum di shelter":
             if (this.inventory.water > 0) {
               this.inventory.water--;
@@ -932,7 +782,7 @@ export default function SurvivalSimulation() {
               this.task = "istirahat";
             }
             break;
-            
+
           case "membuat api di shelter":
             if (this.inventory.wood > 0) {
               this.inventory.wood--;
@@ -941,7 +791,7 @@ export default function SurvivalSimulation() {
               this.task = "istirahat";
             }
             break;
-            
+
           case "memasak":
             // Simulating cooking/preparing food
             if (this.inventory.food >= 1) {
@@ -950,20 +800,28 @@ export default function SurvivalSimulation() {
               this.task = "istirahat";
             }
             break;
-            
+
           case "bersantai":
             this.health = Math.min(100, this.health + 0.3);
             this.activityTimer++;
-            
+
             // Change activity every 60-120 frames
             if (this.activityTimer > 60 + Math.random() * 60) {
               this.activityTimer = 0;
               if (Math.random() < 0.2) {
-                const activities = ["Survivor mengamati api", "Survivor merapikan barang", "Survivor memeriksa perbekalan", "Survivor berjalan santai"];
-                logActivity(activities[Math.floor(Math.random() * activities.length)] + "...");
+                const activities = [
+                  "Survivor mengamati api",
+                  "Survivor merapikan barang",
+                  "Survivor memeriksa perbekalan",
+                  "Survivor berjalan santai",
+                ];
+                logActivity(
+                  activities[Math.floor(Math.random() * activities.length)] +
+                    "..."
+                );
               }
             }
-            
+
             if (isDay && Math.random() < 0.02) {
               inShelter = false;
               canvas.style.display = "block";
@@ -979,117 +837,120 @@ export default function SurvivalSimulation() {
       // Build a plan using RESOURCE BALANCE strategy with nearby resource gathering
       buildPlan() {
         this.plan = [];
-        
-        // SURVIVAL PHASE SYSTEM
-        // Phase 1: Build first shelter (survival critical)
-        // Phase 2: Stock resources after shelter (prepare for harsh conditions)
-        // Phase 3: Upgrade & expand (long-term prosperity)
 
-        // Emergency: Critical stats always take priority
-        if (this.thirst < 30) {
+        // === DARURAT: Stat kritis langsung ambil alih ===
+        if (this.thirst < 40) {
           this.plan.push(this.inventory.water > 0 ? "minum" : "ambil air");
           return;
         }
-        if (this.hunger < 30) {
-          if (this.inventory.food > 0) this.plan.push("makan");
-          else if (this.inventory.fishingrod > 0) this.plan.push("memancing");
-          else this.plan.push("berburu");
+        if (this.hunger < 40) {
+          this.plan.push(
+            this.inventory.food > 0
+              ? "makan"
+              : this.inventory.fishingrod
+              ? "memancing"
+              : "berburu"
+          );
           return;
         }
-        if (this.warmth < 20) {
-          if (this.hasShelter && this.inventory.wood > 0) this.plan.push("membuat api di shelter");
-          else if (this.inventory.wood > 0) this.plan.push("membuat api");
-          else this.plan.push("mencari kayu");
+        if (this.warmth < 45 && !inShelter) {
+          if (this.hasShelter) {
+            this.plan.push("pulang ke shelter");
+          } else if (this.inventory.wood > 0) {
+            this.plan.push("membuat api");
+          } else {
+            this.plan.push("mencari kayu");
+          }
           return;
         }
 
-        // PHASE 1: SHELTER BUILDING (no shelter yet)
+        // === BELUM PUNYA SHELTER? Fokus bangun dulu! ===
         if (!this.hasShelter) {
-          // Check if we have enough to build
           if (this.inventory.wood >= 10 && this.inventory.stone >= 5) {
             this.plan.push("bangun shelter");
-            return;
-          }
-          
-          // Gather what we need
-          if (this.inventory.wood < 10) {
+          } else if (this.inventory.wood < 10) {
             this.plan.push("mencari kayu");
-            return;
-          }
-          if (this.inventory.stone < 5) {
+          } else {
             this.plan.push("mencari batu");
-            return;
+          }
+          return;
+        }
+
+        // === SUDAH PUNYA SHELTER → Stockpile cerdas (terutama musim dingin) ===
+        const target = {
+          food: 22,
+          water: 14,
+          wood: season === 3 ? 80 : 35, // musim dingin butuh kayu gila
+          fur: 15,
+        };
+
+        const deficits = [
+          {
+            cur: this.inventory.water,
+            tgt: target.water,
+            task: "ambil air",
+            prio: 20,
+          },
+          {
+            cur: this.inventory.food,
+            tgt: target.food,
+            task: this.inventory.fishingrod ? "memancing" : "berburu",
+            prio: 15,
+          },
+          {
+            cur: this.inventory.wood,
+            tgt: target.wood,
+            task: "mencari kayu",
+            prio: season === 3 ? 30 : 12,
+          },
+          {
+            cur: this.inventory.fur,
+            tgt: target.fur,
+            task: "berburu",
+            prio: 8,
+          },
+        ];
+
+        // Cari yang paling kurang (weighted)
+        let worst = deficits[0];
+        for (const d of deficits) {
+          if ((d.tgt - d.cur) * d.prio > (worst.tgt - worst.cur) * worst.prio) {
+            worst = d;
           }
         }
 
-        // PHASE 2: STOCKPILING (shelter exists, gather resources)
-        if (this.hasShelter) {
-          const PHASE2_TARGETS = {
-            food: 15,
-            water: 10,
-            wood: 20,
-            stone: 15,
-            fur: 8,
-          };
+        this.plan.push(worst.task);
 
-          // Calculate total deficit
-          const deficits = [
-            { name: "water", current: this.inventory.water, target: PHASE2_TARGETS.water, task: "ambil air", weight: 1.5 },
-            { name: "food", current: this.inventory.food, target: PHASE2_TARGETS.food, task: "berburu", weight: 1.3 },
-            { name: "wood", current: this.inventory.wood, target: PHASE2_TARGETS.wood, task: "mencari kayu", weight: 1.4 },
-            { name: "stone", current: this.inventory.stone, target: PHASE2_TARGETS.stone, task: "mencari batu", weight: 1.2 },
-            { name: "fur", current: this.inventory.fur, target: PHASE2_TARGETS.fur, task: "berburu", weight: 0.8 },
-          ];
-
-          // Filter resources below target
-          const needsWork = deficits.filter((r) => r.current < r.target);
-
-          if (needsWork.length > 0) {
-            // Prioritize by weight (water & wood most important)
-            needsWork.sort((a, b) => b.weight - a.weight);
-            
-            // Pick top priority
-            const topNeed = needsWork[0];
-            this.plan.push(topNeed.task);
-            
-            // Also add a secondary task if urgency is high
-            if (needsWork.length > 1 && topNeed.current < topNeed.target * 0.3) {
-              const secondNeed = needsWork[1];
-              // Avoid duplicate tasks
-              if (topNeed.task !== secondNeed.task) {
-                this.plan.push(secondNeed.task);
-              }
-            }
-            
-            return;
-          }
-
-          // PHASE 3: UPGRADE & CONSOLIDATE (all resources at target)
-          // Upgrade shelter if possible
-          if (this.inventory.wood >= 20 && this.inventory.stone >= 10) {
-            this.plan.push("upgrade shelter");
-            return;
-          }
-
-          // Continue gathering for buffer
-          if (this.inventory.wood < 25) {
-            this.plan.push("mencari kayu");
-            return;
-          }
-          if (this.inventory.food < 20) {
-            this.plan.push("berburu");
-            return;
-          }
-
-          // All good — relax in shelter
-          if (inShelter) {
-            this.plan.push("istirahat");
-            return;
+        // Kalau kekurangan parah banget, tambah satu task lagi
+        if (worst.cur < worst.tgt * 0.4) {
+          const second = deficits
+            .filter((d) => d !== worst)
+            .sort(
+              (a, b) => (b.tgt - b.cur) * b.prio - (a.tgt - a.cur) * a.prio
+            )[0];
+          if (second && second.cur < second.tgt * 0.7) {
+            this.plan.push(second.task);
           }
         }
 
-        // Fallback
-        this.plan.push("mengembara");
+        // === Crafting & upgrade otomatis kalau resource udah aman ===
+        if (
+          !this.inventory.fishingrod &&
+          this.inventory.thread >= 2 &&
+          this.inventory.stone >= 1
+        ) {
+          this.plan.push("buat pancing");
+        } else if (!this.wearingFurCoat && this.inventory.fur >= 5) {
+          this.plan.push("buat baju bulu");
+        } else if (
+          !this.inventory.spear &&
+          this.inventory.wood >= 5 &&
+          this.inventory.stone >= 2
+        ) {
+          this.plan.push("buat tombak");
+        } else if (this.inventory.wood >= 20 && this.inventory.stone >= 10) {
+          this.plan.push("upgrade shelter");
+        }
       }
 
       executeMoveAndAction(
@@ -1177,7 +1038,8 @@ export default function SurvivalSimulation() {
 
         // If health drops to zero by other means, also end the game
         if (this.health <= 0) {
-          const msg = "Survivor tidak dapat bertahan dari kerasnya alam... Game over!";
+          const msg =
+            "Survivor tidak dapat bertahan dari kerasnya alam... Game over!";
           logActivity(msg, true);
           checkAchievements();
           if (gameLoopInterval) clearInterval(gameLoopInterval);
@@ -1307,7 +1169,10 @@ export default function SurvivalSimulation() {
       else if (survivalDays >= 30) ach = "Ranger";
       else if (survivalDays >= 7) ach = "Pemula";
       if (ach) logActivity(`🏆 Achievement: ${ach}!`, true);
-      score = survivalDays * (shelter ? shelter.level : 1) * Math.max(1, survivor.inventory.food);
+      score =
+        survivalDays *
+        (shelter ? shelter.level : 1) *
+        Math.max(1, survivor.inventory.food);
     }
 
     function updateUI() {
@@ -1315,32 +1180,33 @@ export default function SurvivalSimulation() {
         const el = document.getElementById(id);
         if (el) el.textContent = String(value);
       };
-      
+
       const updateBar = (id: string, value: number) => {
         const el = document.getElementById(id);
-        if (el) el.style.width = `${Math.max(0, Math.min(100, Math.round(value)))}%`;
+        if (el)
+          el.style.width = `${Math.max(0, Math.min(100, Math.round(value)))}%`;
       };
-      
+
       // Update main stats
       updateEl("day-display", survivalDays);
       updateEl("score-display", Math.round(score));
       updateEl("temp-display", Math.round(temperature) + "°C");
       updateEl("weather-display", weather);
-      
+
       if (survivor) {
         // Update stat values and bars
         updateEl("warmth-val", Math.round(survivor.warmth));
         updateBar("warmth-bar", survivor.warmth);
-        
+
         updateEl("hunger-val", Math.round(survivor.hunger));
         updateBar("hunger-bar", survivor.hunger);
-        
+
         updateEl("thirst-val", Math.round(survivor.thirst));
         updateBar("thirst-bar", survivor.thirst);
-        
+
         updateEl("health-val", Math.round(survivor.health));
         updateBar("health-bar", survivor.health);
-        
+
         // Update inventory
         updateEl("inv-wood", survivor.inventory.wood || 0);
         updateEl("inv-stone", survivor.inventory.stone || 0);
@@ -1350,7 +1216,7 @@ export default function SurvivalSimulation() {
         updateEl("inv-water", survivor.inventory.water || 0);
         updateEl("inv-shelterlevel", shelter ? shelter.level : 0);
       }
-      
+
       // Update resource counts
       updateEl("res-pohon", countEntities("POHON"));
       updateEl("res-batu", countEntities("BATU"));
@@ -1389,10 +1255,18 @@ export default function SurvivalSimulation() {
           ctx.drawImage(survivorSprite, x, y, displayWidth, displayHeight);
         } else {
           // Fallback to colored squares for other entities
-          ctx.fillStyle = entity.type === "API" 
-            ? (Math.random() > 0.5 ? "#ff9500" : "#ffdd59")
-            : COLORS[entity.type] || "#fff";
-          ctx.fillRect(entity.x * TILE_SIZE, entity.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+          ctx.fillStyle =
+            entity.type === "API"
+              ? Math.random() > 0.5
+                ? "#ff9500"
+                : "#ffdd59"
+              : COLORS[entity.type] || "#fff";
+          ctx.fillRect(
+            entity.x * TILE_SIZE,
+            entity.y * TILE_SIZE,
+            TILE_SIZE,
+            TILE_SIZE
+          );
         }
       });
     }
@@ -1401,52 +1275,76 @@ export default function SurvivalSimulation() {
 
     function drawShelterInterior() {
       shelterCtx.clearRect(0, 0, shelterCanvas.width, shelterCanvas.height);
-      
+
       // Background
       shelterCtx.fillStyle = "#4d3a2b";
       shelterCtx.fillRect(0, 0, shelterCanvas.width, shelterCanvas.height);
-      
+
       // Walls
       shelterCtx.fillStyle = "#7d5a3e";
       const wallThickness = 20;
       shelterCtx.fillRect(0, 0, shelterCanvas.width, wallThickness);
-      shelterCtx.fillRect(0, shelterCanvas.height - wallThickness, shelterCanvas.width, wallThickness);
+      shelterCtx.fillRect(
+        0,
+        shelterCanvas.height - wallThickness,
+        shelterCanvas.width,
+        wallThickness
+      );
       shelterCtx.fillRect(0, 0, wallThickness, shelterCanvas.height);
-      shelterCtx.fillRect(shelterCanvas.width - wallThickness, 0, wallThickness, shelterCanvas.height);
-      
+      shelterCtx.fillRect(
+        shelterCanvas.width - wallThickness,
+        0,
+        wallThickness,
+        shelterCanvas.height
+      );
+
       // Draw furniture and activity zones
-      const drawActivityZone = (x: number, y: number, w: number, h: number, label: string, icon: string) => {
+      const drawActivityZone = (
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        label: string,
+        icon: string
+      ) => {
         shelterCtx.fillStyle = "#5a4a3a";
         shelterCtx.fillRect(x, y, w, h);
         shelterCtx.strokeStyle = "#8d7d6d";
         shelterCtx.lineWidth = 2;
         shelterCtx.strokeRect(x, y, w, h);
-        
+
         // Icon
         shelterCtx.fillStyle = "#ffb700";
         shelterCtx.font = "20px Arial";
         shelterCtx.textAlign = "center";
         shelterCtx.textBaseline = "middle";
         shelterCtx.fillText(icon, x + w / 2, y + h / 2 - 15);
-        
+
         // Label
         shelterCtx.fillStyle = "#aaa";
         shelterCtx.font = "9px Arial";
         shelterCtx.fillText(label, x + w / 2, y + h / 2 + 15);
       };
-      
+
       // Sleeping area
       drawActivityZone(40, 50, 60, 60, "Sleep", "🛏️");
-      
+
       // Cooking area
       drawActivityZone(shelterCanvas.width - 100, 50, 60, 60, "Cook", "🔥");
-      
+
       // Water storage
       drawActivityZone(40, shelterCanvas.height - 110, 60, 60, "Water", "💧");
-      
+
       // Food storage
-      drawActivityZone(shelterCanvas.width - 100, shelterCanvas.height - 110, 60, 60, "Food", "🍖");
-      
+      drawActivityZone(
+        shelterCanvas.width - 100,
+        shelterCanvas.height - 110,
+        60,
+        60,
+        "Food",
+        "🍖"
+      );
+
       // Fire in center
       const fireCenterX = shelterCanvas.width / 2;
       const fireCenterY = shelterCanvas.height / 2;
@@ -1456,7 +1354,7 @@ export default function SurvivalSimulation() {
         shelterCtx.beginPath();
         shelterCtx.arc(fireCenterX, fireCenterY, 25, 0, Math.PI * 2);
         shelterCtx.fill();
-        
+
         // Glow effect
         shelterCtx.fillStyle = "rgba(255, 149, 0, 0.3)";
         shelterCtx.beginPath();
@@ -1473,14 +1371,14 @@ export default function SurvivalSimulation() {
         shelterCtx.textBaseline = "middle";
         shelterCtx.fillText("❌", fireCenterX, fireCenterY);
       }
-      
+
       // Survivor position with animation - dynamically based on task
       const survivorSize = 24 + 4 * (shelter.level - 1);
       let survivorX = shelterCanvas.width / 2;
       let survivorY = shelterCanvas.height * 0.75;
       let activity = "";
       let activityColor = "#ff4757";
-      
+
       if (survivor) {
         // Move survivor to different locations based on current activity
         switch (survivor.task) {
@@ -1520,8 +1418,12 @@ export default function SurvivalSimulation() {
             const wanderRange = (shelterCanvas.width - 160) / 2;
             const centerX = shelterCanvas.width / 2;
             const centerY = shelterCanvas.height / 2;
-            survivorX = centerX + Math.sin(globalTime * wanderSpeed) * wanderRange;
-            survivorY = centerY + Math.cos(globalTime * wanderSpeed * 0.8) * (shelterCanvas.height / 3);
+            survivorX =
+              centerX + Math.sin(globalTime * wanderSpeed) * wanderRange;
+            survivorY =
+              centerY +
+              Math.cos(globalTime * wanderSpeed * 0.8) *
+                (shelterCanvas.height / 3);
             activity = "🚶";
             activityColor = "#00d4ff";
             break;
@@ -1531,13 +1433,13 @@ export default function SurvivalSimulation() {
             activity = "⚙️";
         }
       }
-      
+
       // Draw survivor
       shelterCtx.fillStyle = activityColor;
       shelterCtx.beginPath();
       shelterCtx.arc(survivorX, survivorY, survivorSize / 2, 0, Math.PI * 2);
       shelterCtx.fill();
-      
+
       // Draw activity indicator above survivor
       if (activity) {
         shelterCtx.font = "24px Arial";
@@ -1545,7 +1447,7 @@ export default function SurvivalSimulation() {
         shelterCtx.textBaseline = "middle";
         shelterCtx.fillText(activity, survivorX, survivorY - survivorSize - 20);
       }
-      
+
       // Status text
       shelterCtx.fillStyle = "#aaa";
       shelterCtx.font = "11px Arial";
@@ -1613,13 +1515,17 @@ export default function SurvivalSimulation() {
       inShelter = false;
       isPaused = false;
       speedMultiplier = 1;
-      
-      const cycleSpeedInput = document.getElementById("cycle-speed") as HTMLInputElement;
+
+      const cycleSpeedInput = document.getElementById(
+        "cycle-speed"
+      ) as HTMLInputElement;
       if (cycleSpeedInput) cycleSpeed = parseInt(cycleSpeedInput.value);
-      
-      const petaSizeInput = document.getElementById("peta-size") as HTMLInputElement;
+
+      const petaSizeInput = document.getElementById(
+        "peta-size"
+      ) as HTMLInputElement;
       if (petaSizeInput) mapSize = parseInt(petaSizeInput.value);
-      
+
       // Set canvas dengan aspect ratio yang baik
       if (canvas) {
         const wrapper = document.getElementById("canvas-wrapper");
@@ -1627,11 +1533,11 @@ export default function SurvivalSimulation() {
           const wrapperRect = wrapper.getBoundingClientRect();
           const availableWidth = wrapperRect.width || 600;
           const availableHeight = wrapperRect.height || 400;
-          
+
           // Target aspect ratio: 16:10
           let canvasWidth = mapSize * TILE_SIZE;
           let canvasHeight = Math.round(canvasWidth * 0.625); // 16:10 ratio
-          
+
           // Scale down if doesn't fit
           if (canvasWidth > availableWidth || canvasHeight > availableHeight) {
             const scaleX = availableWidth / canvasWidth;
@@ -1640,25 +1546,25 @@ export default function SurvivalSimulation() {
             canvasWidth = Math.round(canvasWidth * scale);
             canvasHeight = Math.round(canvasHeight * scale);
           }
-          
+
           canvas.width = canvasWidth;
           canvas.height = canvasHeight;
           canvas.style.display = "block";
         }
       }
-      
+
       if (shelterCanvas) {
         shelterCanvas.width = canvas!.width;
         shelterCanvas.height = canvas!.height;
         shelterCanvas.style.display = "none";
       }
-      
+
       mapHeight = Math.floor(canvas!.height / TILE_SIZE);
-      
+
       generateMap();
       placeEntities();
       logActivity("Survivor terdampar di Taiga! Bertahanlah!", true);
-      
+
       gameLoopInterval = setInterval(gameLoop, 300 / speedMultiplier);
     }
 
