@@ -531,8 +531,8 @@ export default function SurvivalSimulation() {
         this.performTask();
       }
 
-      findNearest(type: string) {
-        let closest = null;
+      findNearest(type: string): Entity | null {
+        let closest: Entity | null = null;
         let minDistance = Infinity;
         entities.forEach(e => {
           if (e.type === type) {
