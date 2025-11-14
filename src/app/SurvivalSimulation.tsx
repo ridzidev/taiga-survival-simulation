@@ -242,7 +242,7 @@ export default function SurvivalSimulation() {
       update: () => void;
       constructor(x: number, y: number, public isIndoor = false) {
         super(x, y, "API");
-        this.lifespan = isIndoor ? 500 : 250;
+        this.lifespan = isIndoor ? 1440 : 250;
         this.update = () => {
           this.lifespan--;
           if (weather === "hujan" && !this.isIndoor) this.lifespan -= 2;
@@ -740,50 +740,31 @@ export default function SurvivalSimulation() {
             this.wander();
             break;
           case "istirahat":
-            // DI SHELTER = HARUS JAGA KEHANGATAN DULU (FIX KEDINGINAN!)
-            if (inShelter || !isDay) {
-              // Prioritas 1: API (selalu kalau api padam atau kurang)
-              if (
-                this.inventory.wood > 0 &&
-                shelter &&
-                (!shelter.fire || shelter.fire.lifespan < 120)
-              ) {
-                this.task = "membuat api di shelter";
-                this.performTask();
-                return;
-              }
-              // Prioritas 2: Makan kalau lapar
-              if (this.hunger < 75 && this.inventory.food > 0) {
-                this.task = "makan di shelter";
-                this.performTask();
-                return;
-              }
-              // Prioritas 3: Minum kalau haus
-              if (this.thirst < 75 && this.inventory.water > 0) {
-                this.task = "minum di shelter";
-                this.performTask();
-                return;
-              }
-              // Prioritas 4: Tidur kalau luka
-              if (this.health < 90) {
-                this.task = "tidur";
-                this.performTask();
-                return;
-              }
-              // Prioritas 5: Memasak kalau ada stok
-              if (Math.random() < 0.4 && this.inventory.food >= 3) {
-                this.task = "memasak";
-                this.performTask();
-                return;
-              }
-              // Santai
-              this.task = "bersantai";
+          // DI SHELTER = API HARUS HIDUP DULU! (ini yang bikin survivor SELAMAT)
+          if (inShelter) {
+            // API padam atau sisa < 6 jam → langsung isi ulang!
+            if (this.inventory.wood > 0 && shelter && (!shelter.fire || shelter.fire.lifespan < 720)) {
+              this.task = "membuat api di shelter";
+              this.performTask();
+              return;
+            }
+
+            if (this.hunger < 80 && this.inventory.food > 0) {
+              this.task = "makan di shelter";
+            } else if (this.thirst < 80 && this.inventory.water > 0) {
+              this.task = "minum di shelter";
+            } else if (this.health < 95) {
+              this.task = "tidur";
+            } else if (Math.random() < 0.4 && this.inventory.food >= 3) {
+              this.task = "memasak";
             } else {
-              // Di luar shelter siang → santai aja
               this.task = "bersantai";
             }
-            this.performTask();
-            break;
+          } else {
+            this.task = "bersantai";
+          }
+          this.performTask();
+          break;
           case "tidur":
             this.health = Math.min(100, this.health + 1.5);
             this.warmth = Math.min(100, this.warmth + 0.8);
@@ -811,14 +792,22 @@ export default function SurvivalSimulation() {
             }
             break;
 
-          case "membuat api di shelter":
-            if (this.inventory.wood > 0) {
-              this.inventory.wood--;
-              shelter.fire = new Fire(shelter.x, shelter.y, true);
-              logActivity("Survivor membuat api untuk kehangatan. 🔥", true);
-              this.task = "istirahat";
-            }
-            break;
+            case "membuat api di shelter":
+              if (this.inventory.wood > 0) {
+                this.inventory.wood--;
+                if (shelter.fire) {
+                  // Tambah umur api yang sudah ada (top-up)
+                  shelter.fire.lifespan += 1440;
+                  logActivity("Survivor menambah kayu ke api di shelter. Api bertahan lebih lama! +12 jam", true);
+                } else {
+                  // Nyalain baru
+                  shelter.fire = new Fire(shelter.x, shelter.y, true);
+                  logActivity("Survivor menyalakan api di shelter. Hangat sepanjang malam!", true);
+                }
+                this.planAdvance = true;
+                this.task = "istirahat";
+              }
+              break;
 
           case "memasak":
             // Simulating cooking/preparing food
@@ -1009,13 +998,26 @@ export default function SurvivalSimulation() {
 
       updateStatus() {
         let fireDistance = Infinity;
-        if (inShelter && shelter.fire) {
+        if (inShelter && shelter?.fire) {
           fireDistance = 0;
         } else {
           const fire = this.findNearest("API");
-          fireDistance = fire
-            ? Math.abs(this.x - fire.x) + Math.abs(this.y - fire.y)
-            : Infinity;
+          fireDistance = fire ? Math.abs(this.x - fire.x) + Math.abs(this.y - fire.y) : Infinity;
+        }
+
+        if (fireDistance <= 3) {
+          // API INDOOR = SANGAT KUAT
+          const warmthGain = inShelter ? 10 : 3;
+          this.warmth = Math.min(100, this.warmth + warmthGain);
+        } else {
+          // Drop normal
+          let tempDrop = 0.05 * (15 - temperature);
+          if (!isDay) tempDrop *= 1.7;
+          if (weather === "salju") tempDrop *= 2.2;
+          if (weather === "hujan") tempDrop *= 1.3;
+          if (this.wearingFurCoat) tempDrop *= 0.6;
+          if (inShelter) tempDrop *= 1 - 0.35 * shelter.level;
+          this.warmth -= tempDrop;
         }
 
         let tempDrop = 0.05 * (15 - temperature);
