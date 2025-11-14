@@ -1,279 +1,125 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Play, Pause, SkipForward, Download, Home, Flame, Heart, Droplet, Thermometer, Sun, Moon } from 'lucide-react';
 
 export default function SurvivalSimulation() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
-
-    // Clear any existing content
     containerRef.current.innerHTML = '';
 
-    // Create the HTML structure
-    const header = document.createElement('div');
-    header.id = 'header';
-    header.innerHTML = `
-      <div id="status-display">
-        <h4>Status Survivor</h4>
-        <small>Kehangatan</small>
-        <div class="status-bar"><div id="warmth-bar" style="width: 100%;"></div></div>
-        <small>Rasa Lapar</small>
-        <div class="status-bar"><div id="hunger-bar" style="width: 100%;"></div></div>
-        <small>Rasa Haus</small>
-        <div class="status-bar"><div id="thirst-bar" style="width: 100%;"></div></div>
-        <small>Kesehatan</small>
-        <div class="status-bar"><div id="health-bar" style="width: 100%;"></div></div>
-        <div class="inventory-item"><strong>Kayu:</strong> <span id="inv-wood">0</span></div>
-        <div class="inventory-item"><strong>Batu:</strong> <span id="inv-stone">0</span></div>
-        <div class="inventory-item"><strong>Makanan:</strong> <span id="inv-food">0</span></div>
-        <div class="inventory-item"><strong>Bulu:</strong> <span id="inv-fur">0</span></div>
-        <div class="inventory-item"><strong>Benang:</strong> <span id="inv-thread">0</span></div>
-        <div class="inventory-item"><strong>Pancing:</strong> <span id="inv-fishingrod">0</span></div>
-        <div class="inventory-item"><strong>Baju Bulu:</strong> <span id="inv-furcoat">0</span></div>
-        <div class="inventory-item"><strong>Tombak:</strong> <span id="inv-spear">0</span></div>
-        <div class="inventory-item"><strong>Perangkap:</strong> <span id="inv-trap">0</span></div>
-        <div class="inventory-item"><strong>Air:</strong> <span id="inv-water">0</span></div>
-        <div class="inventory-item"><strong>Level Shelter:</strong> <span id="inv-shelterlevel">0</span></div>
-        <div id="survival-time">Waktu Bertahan: 0 hari</div>
-        <div id="day-night-indicator">Waktu: Siang</div>
-        <div id="temperature-display">Suhu: 15°C</div>
-        <div id="score-display">Score: 0</div>
-      </div>
-    `;
+    // Inject Tailwind CDN (untuk dev cepat)
+    const tailwind = document.createElement('script');
+    tailwind.src = 'https://cdn.tailwindcss.com';
+    document.head.appendChild(tailwind);
 
-    const gameContainer = document.createElement('div');
-    gameContainer.id = 'game-container';
-    gameContainer.innerHTML = `
-      <div id="ui-panel">
-        <div>
-          <h3>Parameter Simulasi</h3>
-          <div class="param-group">
-            <label for="peta-size">Ukuran Peta (contoh: 60)</label>
-            <input type="number" id="peta-size" value="60">
-          </div>
-          <div class="param-group">
-            <label for="pohon-count">Jumlah Pohon</label>
-            <input type="number" id="pohon-count" value="100">
-          </div>
-          <div class="param-group">
-            <label for="batu-count">Jumlah Batu</label>
-            <input type="number" id="batu-count" value="50">
-          </div>
-          <div class="param-group">
-            <label for="hewan-count">Jumlah Hewan Buruan</label>
-            <input type="number" id="hewan-count" value="15">
-          </div>
-          <div class="param-group">
-            <label for="predator-count">Jumlah Binatang Buas</label>
-            <input type="number" id="predator-count" value="5">
-          </div>
-          <div class="param-group">
-            <label for="cycle-speed">Kecepatan Siklus Siang-Malam (1-10)</label>
-            <input type="number" id="cycle-speed" value="5" min="1" max="10">
-          </div>
-          <div class="param-group">
-            <label for="ai-intelligence">Kecerdasan AI (1-10)</label>
-            <input type="number" id="ai-intelligence" value="5" min="1" max="10">
-          </div>
-        </div>
-        <button id="start-sim">Mulai / Atur Ulang</button>
-        <div id="controls">
-          <button id="pause-btn">Pause</button>
-          <button id="ff-btn">Fast Forward (x2)</button>
-          <button id="export-log">Export Log</button>
-        </div>
-      </div>
-      <div id="main-content">
-        <canvas id="gameCanvas" width="840" height="600"></canvas>
-        <canvas id="mini-map" width="200" height="150"></canvas>
-        <canvas id="shelter-canvas"></canvas>
-        <div id="activity-log">
-          <p>Selamat datang di simulasi bertahan hidup terbaik di Taiga! Fitur baru: AI ditingkatkan, thirst, musim, event, regenerate resource, tombak, perangkap, mini-map, pause/FF, sound, achievement.</p>
-        </div>
-      </div>
-    `;
-
-    containerRef.current.appendChild(header);
-    containerRef.current.appendChild(gameContainer);
-
-    // Add styles
     const style = document.createElement('style');
     style.textContent = `
-      body {
-        font-family: 'Courier New', Courier, monospace;
-        background-color: #1a1a1a;
-        color: #f0f0f0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 20px;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-      }
-      #header {
-        width: 100%;
-        max-width: 1200px;
-        display: flex;
-        justify-content: space-between;
-        gap: 20px;
-        margin-bottom: 20px;
-      }
-      #status-display {
-        flex: 1;
-        background-color: #2a2a2a;
-        border: 2px solid #555;
-        padding: 15px;
-      }
-      #status-display h4 {
-        margin: 0 0 10px 0;
-        border-bottom: 1px solid #555;
-        padding-bottom: 10px;
-      }
-      .status-bar {
-        background-color: #444;
-        border-radius: 3px;
-        overflow: hidden;
-        margin-bottom: 8px;
-      }
-      .status-bar div {
-        height: 12px;
-        border-radius: 3px;
-        transition: width 0.3s;
-      }
-      #warmth-bar { background-color: #e67e22; }
-      #hunger-bar { background-color: #c0392b; }
-      #thirst-bar { background-color: #3498db; }
-      #health-bar { background-color: #2ecc71; }
-      .inventory-item {
-        font-size: 14px;
-      }
-      #survival-time {
-        font-size: 16px;
-        font-weight: bold;
-        color: #27ae60;
-        margin-top: 10px;
-      }
-      #day-night-indicator {
-        font-size: 14px;
-        color: #bdc3c7;
-      }
-      #temperature-display {
-        font-size: 14px;
-        color: #3498db;
-      }
-      #score-display {
-        font-size: 14px;
-        color: #ffcc00;
-      }
-      #game-container {
-        width: 100%;
-        max-width: 1200px;
-        display: flex;
-        gap: 20px;
-      }
-      #ui-panel {
-        padding: 20px;
-        background-color: #2a2a2a;
-        border: 2px solid #555;
-        width: 280px;
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-      }
-      .param-group {
-        margin-bottom: 5px;
-      }
-      .param-group label {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 14px;
-        color: #aaa;
-      }
-      .param-group input {
-        width: 100%;
-        box-sizing: border-box;
-        background-color: #333;
-        border: 1px solid #555;
-        color: #f0f0f0;
-        padding: 8px;
-        border-radius: 3px;
-      }
-      button {
-        width: 100%;
-        padding: 12px;
-        background-color: #507A52;
-        color: white;
-        border: none;
-        cursor: pointer;
-        font-size: 16px;
-        font-weight: bold;
-        border-radius: 3px;
-        transition: background-color 0.2s;
-      }
-      button:hover {
-        background-color: #619363;
-      }
-      #controls {
-        display: flex;
-        gap: 10px;
-      }
-      #controls button {
-        flex: 1;
-        padding: 8px;
-      }
-      #activity-log {
-        width: 100%;
-        box-sizing: border-box;
-        height: 200px;
-        background-color: #222;
-        border: 1px solid #555;
-        padding: 10px;
-        overflow-y: scroll;
-        font-size: 13px;
-        line-height: 1.6;
-      }
-      #activity-log p {
-        margin: 0 0 5px 0;
-        color: #ccc;
-      }
-      #activity-log p.important {
-        color: #ffc107;
-        font-weight: bold;
-      }
-      #main-content {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        flex: 1;
-      }
-      canvas {
-        border: 2px solid #555;
-        background-color: #000;
-        image-rendering: -moz-crisp-edges;
-        image-rendering: -webkit-crisp-edges;
-        image-rendering: pixelated;
-        image-rendering: crisp-edges;
-      }
-      #gameCanvas {
-        width: 840px;
-        height: 600px;
-      }
-      #mini-map {
-        width: 200px;
-        height: 150px;
-        border: 1px solid #555;
-        align-self: flex-end;
-      }
-      #shelter-canvas {
-        display: none;
-        width: 840px;
-        height: 300px;
-      }
+      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Roboto+Mono:wght@300;400;500&display=swap');
+      body { background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 100%); margin:0; font-family: 'Roboto Mono', monospace; }
+      .orbitron { font-family: 'Orbitron', sans-serif; }
     `;
     document.head.appendChild(style);
 
+    containerRef.current.innerHTML = `
+      <div class="min-h-screen text-gray-100 p-4">
+        <!-- TOP BAR: Status Survivor -->
+        <div class="max-w-7xl mx-auto mb-4 bg-gray-900/80 backdrop-blur-lg border border-gray-800 rounded-2xl p-6 shadow-2xl">
+          <div class="flex items-center justify-between mb-4">
+            <h1 class="text-3xl orbitron text-amber-400 tracking-wider">TAIGA SURVIVAL</h1>
+            <div class="flex gap-6 text-lg">
+              <div class="flex items-center gap-2"><Sun class="w-5 h-5 text-yellow-400" /> <span id="day-night">Siang</span></div>
+              <div class="flex items-center gap-2"><Thermometer class="w-5 h-5 text-red-400" /> <span id="temp">15°C</span></div>
+              <div class="text-2xl font-bold text-green-400" id="survival-time">0 hari</div>
+              <div class="text-xl text-amber-300" id="score-display">Score: 0</div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+              <div class="flex items-center gap-3 mb-2"><Flame class="w-6 h-6 text-orange-500" /><span class="text-sm">Kehangatan</span></div>
+              <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden"><div id="warmth-bar" class="h-full bg-gradient-to-r from-orange-600 to-yellow-500 w-full transition-all duration-500"></div></div>
+            </div>
+            <div class="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+              <div class="flex items-center gap-3 mb-2"><span class="text-red-500 text-xl">❤️</span><span class="text-sm">Lapar</span></div>
+              <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden"><div id="hunger-bar" class="h-full bg-gradient-to-r from-red-600 to-pink-500 w-full"></div></div>
+            </div>
+            <div class="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+              <div class="flex items-center gap-3 mb-2"><Droplet class="w-6 h-6 text-blue-400" /><span class="text-sm">Haus</span></div>
+              <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden"><div id="thirst-bar" class="h-full bg-gradient-to-r from-blue-600 to-cyan-400 w-full"></div></div>
+            </div>
+            <div class="bg-gray-800/60 rounded-xl p-4 border border-gray-700">
+              <div class="flex items-center gap-3 mb-2"><Heart class="w-6 h-6 text-green-500" /><span class="text-sm">Kesehatan</span></div>
+              <div class="w-full bg-gray-700 rounded-full h-4 overflow-hidden"><div id="health-bar" class="h-full bg-gradient-to-r from-green-600 to-emerald-400 w-full"></div></div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-5 md:grid-cols-10 gap-3 mt-5 text-sm">
+            <div class="bg-gray-800/50 rounded-lg p-3 text-center"><strong>Kayu</strong><br><span id="inv-wood">0</span></div>
+            <div class="bg-gray-800/50 rounded-lg p-3 text-center"><strong>Batu</strong><br><span id="inv-stone">0</span></div>
+            <div class="bg-gray-800/50 rounded-lg p-3 text-center"><strong>Makan</strong><br><span id="inv-food">0</span></div>
+            <div class="bg-gray-800/50 rounded-lg p-3 text-center"><strong>Bulu</strong><br><span id="inv-fur">0</span></div>
+            <div class="bg-gray-800/50 rounded-lg p-3 text-center"><strong>Air</strong><br><span id="inv-water">0</span></div>
+            <div class="bg-gray-800/50 rounded-lg p-3 text-center"><strong>Pancing</strong><br><span id="inv-fishingrod">0</span></div>
+            <div class="bg-gray-800/50 rounded-lg p-3 text-center"><strong>Baju</strong><br><span id="inv-furcoat">0</span></div>
+            <div class="bg-gray-800/50 rounded-lg p-3 text-center"><strong>Tombak</strong><br><span id="inv-spear">0</span></div>
+            <div class="bg-gray-800/50 rounded-lg p-3 text-center"><strong>Jebakan</strong><br><span id="inv-trap">0</span></div>
+            <div class="bg-gray-800/50 rounded-lg p-3 text-center"><strong>Shelter</strong><br><span id="inv-shelterlevel">0</span></div>
+          </div>
+        </div>
+
+        <div class="max-w-7xl mx-auto grid grid-cols-1 xl:grid-cols-4 gap-4">
+          <!-- LEFT PANEL: Controls + Mini Map -->
+          <div class="space-y-4">
+            <div class="bg-gray-900/80 backdrop-blur-lg border border-gray-800 rounded-2xl p-6 shadow-2xl">
+              <h3 class="text-xl orbitron text-cyan-400 mb-4">Parameter Simulasi</h3>
+              <div class="space-y-4">
+                <div><label class="text-xs text-gray-400">Ukuran Peta</label><input id="peta-size" type="number" value="60" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 focus:border-cyan-500 outline-none transition"></div>
+                <div><label class="text-xs text-gray-400">Pohon</label><input id="pohon-count" type="number" value="100" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2"></div>
+                <div><label class="text-xs text-gray-400">Batu</label><input id="batu-count" type="number" value="50" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2"></div>
+                <div><label class="text-xs text-gray-400">Hewan Buruan</label><input id="hewan-count" type="number" value="15" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2"></div>
+                <div><label class="text-xs text-gray-400">Predator</label><input id="predator-count" type="number" value="5" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2"></div>
+                <div><label class="text-xs text-gray-400">Siklus Siang-Malam (1-10)</label><input id="cycle-speed" type="number" min="1" max="10" value="5" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2"></div>
+                <div><label class="text-xs text-gray-400">Kecerdasan AI (1-10)</label><input id="ai-intelligence" type="number" min="1" max="10" value="5" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2"></div>
+              </div>
+              <button id="start-sim" class="mt-6 w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold py-4 rounded-xl shadow-lg transform hover:scale-105 transition flex items-center justify-center gap-2">
+                <Play class="w-5 h-5" /> Mulai / Reset
+              </button>
+            </div>
+
+            <div class="bg-gray-900/80 backdrop-blur-lg border border-gray-800 rounded-2xl p-4 shadow-2xl">
+              <h3 class="text-lg orbitron text-emerald-400 mb-3">Mini Map</h3>
+              <canvas id="mini-map" width="280" height="210" class="w-full rounded-lg border-2 border-gray-700"></canvas>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3">
+              <button id="pause-btn" class="bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-4 rounded-xl flex items-center justify-center"><Pause class="w-6 h-6" /></button>
+              <button id="ff-btn" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-4 rounded-xl">FF x2</button>
+              <button id="export-log" class="bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 rounded-xl"><Download class="w-6 h-6" /></button>
+            </div>
+          </div>
+
+          <!-- MAIN CANVAS -->
+          <div class="xl:col-span-2">
+            <div class="bg-gray-900/80 backdrop-blur-lg border border-gray-800 rounded-2xl overflow-hidden shadow-2xl">
+              <canvas id="gameCanvas" width="840" height="620" class="w-full pixelated"></canvas>
+              <canvas id="shelter-canvas" width="840" height="620" class="w-full pixelated hidden"></canvas>
+            </div>
+          </div>
+
+          <!-- RIGHT PANEL: Activity Log -->
+          <div class="bg-gray-900/80 backdrop-blur-lg border border-gray-800 rounded-2xl p-6 shadow-2xl flex flex-col">
+            <h3 class="text-xl orbitron text-amber-400 mb-4">Activity Log</h3>
+            <div id="activity-log" class="flex-1 bg-black/40 rounded-lg p-4 overflow-y-auto font-mono text-sm leading-relaxed scrollbar-thin scrollbar-thumb-gray-600">
+              <p class="text-gray-400">Selamat datang di simulasi bertahan hidup Taiga!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+    
     // Now add the JavaScript logic
     const canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d')!;
