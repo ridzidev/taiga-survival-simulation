@@ -306,7 +306,7 @@ export default function SurvivalSimulation() {
       INTERIOR_SURVIVOR: '#ff4757',
       INTERIOR_FIRE: '#f0932b'
     };
-    let mapSize: number, mapHeight: number;
+    let mapSize: number = 60, mapHeight: number = 42;
     let grid: string[][] = [];
     let entities: Entity[] = [];
     let survivor: any;
@@ -383,17 +383,17 @@ export default function SurvivalSimulation() {
               this.y += moveY;
             }
           }
-          if (this.type === 'PREDATOR' && survivor && !inShelter && Math.abs(this.x - survivor.x) + Math.abs(this.y - survivor.y) <= 1 && Math.random() < 0.05) {
-            survivor.health -= survivor.inventory.spear ? 5 : 10;
-            logActivity('Binatang buas menyerang survivor!', true);
-          } else if (survivor && Math.abs(this.x - survivor.x) + Math.abs(this.y - survivor.y) < 5 && Math.random() < 0.2) {
-            const dx = Math.sign(this.x - survivor.x);
-            const dy = Math.sign(this.y - survivor.y);
-            if (this.isValidMove(this.x + dx, this.y + dy)) {
-              this.x += dx;
-              this.y += dy;
-            }
-          }
+      if (this.type === 'PREDATOR' && survivor && survivor.health > 0 && !inShelter && Math.abs(this.x - survivor.x) + Math.abs(this.y - survivor.y) <= 1 && Math.random() < 0.05) {
+        survivor.health -= survivor.inventory.spear ? 5 : 10;
+        logActivity('Binatang buas menyerang survivor!', true);
+      } else if (survivor && Math.abs(this.x - survivor.x) + Math.abs(this.y - survivor.y) < 5 && Math.random() < 0.2) {
+        const dx = Math.sign(this.x - survivor.x);
+        const dy = Math.sign(this.y - survivor.y);
+        if (this.isValidMove(this.x + dx, this.y + dy)) {
+          this.x += dx;
+          this.y += dy;
+        }
+      }
         };
       }
       isValidMove(x: number, y: number) {
@@ -423,8 +423,8 @@ export default function SurvivalSimulation() {
         this.fire = null;
         this.update = () => {
           if (this.fire) {
-            this.fire.update();
-            if (this.fire.lifespan <= 0) {
+            this.fire!.update();
+            if (this.fire!.lifespan <= 0) {
               this.fire = null;
               logActivity('Api di shelter padam.');
             }
@@ -646,7 +646,7 @@ export default function SurvivalSimulation() {
             break;
           case 'memancing':
             this.target = this.findNearestWater();
-            if (this.target && Math.abs(this.x - this.target.x) <= 1 && Math.abs(this.y - this.target.y) <= 1) {
+            if (this.target && typeof this.target === 'object' && 'x' in this.target && 'y' in this.target && typeof this.target.x === 'number' && typeof this.target.y === 'number' && Math.abs(this.x - this.target.x) <= 1 && Math.abs(this.y - this.target.y) <= 1) {
               if (Math.random() < 0.3) {
                 this.inventory.food += 2;
                 logActivity('Survivor berhasil memancing ikan!');
@@ -660,7 +660,7 @@ export default function SurvivalSimulation() {
             break;
           case 'ambil air':
             this.target = this.findNearestWater();
-            if (this.target && Math.abs(this.x - this.target.x) <= 1 && Math.abs(this.y - this.target.y) <= 1) {
+            if (this.target && typeof this.target === 'object' && 'x' in this.target && 'y' in this.target && typeof this.target.x === 'number' && typeof this.target.y === 'number' && Math.abs(this.x - this.target.x) <= 1 && Math.abs(this.y - this.target.y) <= 1) {
               this.inventory.water += 2;
               logActivity('Survivor mengambil air dari sungai.');
               this.target = null;
@@ -747,7 +747,7 @@ export default function SurvivalSimulation() {
             break;
           case 'pulang ke shelter':
             this.target = this.home;
-            if (Math.abs(this.x - this.target.x) <= 1 && Math.abs(this.y - this.target.y) <= 1) {
+            if (this.target && typeof this.target === 'object' && 'x' in this.target && 'y' in this.target && typeof this.target.x === 'number' && typeof this.target.y === 'number' && Math.abs(this.x - this.target.x) <= 1 && Math.abs(this.y - this.target.y) <= 1) {
               inShelter = true;
               canvas.style.display = 'none';
               miniMapCanvas.style.display = 'none';
@@ -778,7 +778,7 @@ export default function SurvivalSimulation() {
       }
 
       executeMoveAndAction(targetType: string, inventoryItem: string, logMsg: string) {
-        if (Math.abs(this.x - this.target.x) <= 1 && Math.abs(this.y - this.target.y) <= 1) {
+        if (this.target && typeof this.target === 'object' && 'x' in this.target && 'y' in this.target && typeof this.target.x === 'number' && typeof this.target.y === 'number' && Math.abs(this.x - this.target.x) <= 1 && Math.abs(this.y - this.target.y) <= 1) {
           this.inventory[inventoryItem]++;
           entities = entities.filter(e => e.id !== this.target.id);
           this.target = null;
@@ -1053,24 +1053,24 @@ export default function SurvivalSimulation() {
           logActivity(`Cuaca berubah menjadi ${weather}.`, true);
         }
 
-        if (globalTime % 240 === 0) survivalDays++;
+    if (globalTime % 240 === 0) survivalDays++;
+    if (survivor) {
+      survivor.updateStatus();
+      survivor.updateAI();
+    }
+    entities = entities.filter(e => {
+      if (typeof e.update === 'function') e.update();
+      if (e.type === 'API') {
+        if (e.lifespan !== undefined && e.lifespan <= 0) {
+          logActivity('Api unggun telah padam.');
+          return false;
+        }
+      }
+      return true;
+    });
 
-        survivor.updateStatus();
-        survivor.updateAI();
-
-        entities = entities.filter(e => {
-          if (typeof e.update === 'function') e.update();
-          if (e.type === 'API') {
-            if (e.lifespan !== undefined && e.lifespan <= 0) {
-              logActivity('Api unggun telah padam.');
-              return false;
-            }
-          }
-          return true;
-        });
-
-        regenerateResources();
-        updateEvents();
+    regenerateResources();
+    updateEvents();
       }
     }
 
