@@ -360,6 +360,7 @@ export default function SurvivalSimulation() {
     }
 
     class Fire extends Entity {
+      update: () => void;
       constructor(x: number, y: number, public isIndoor = false) {
         super(x, y, 'API');
         this.lifespan = isIndoor ? 500 : 250;
@@ -423,8 +424,9 @@ export default function SurvivalSimulation() {
         this.fire = null;
         this.update = () => {
           if (this.fire) {
-            this.fire!.update();
-            if (this.fire!.lifespan <= 0) {
+            const fire = this.fire;
+            fire.update();
+            if (fire.lifespan <= 0) {
               this.fire = null;
               logActivity('Api di shelter padam.');
             }
@@ -566,7 +568,7 @@ export default function SurvivalSimulation() {
       }
 
       pathfind(target: any): {x: number, y: number} | null {
-        if (!target || typeof target !== 'object' || !('x' in target) || !('y' in target) || typeof target.x !== 'number' || typeof target.y !== 'number') return null;
+        if (!target) return null;
         const typedTarget = target as {x: number, y: number};
         const queue: Array<{x: number, y: number, path: Array<{x: number, y: number}>}> = [{x: this.x, y: this.y, path: []}];
         const visited = new Set();
