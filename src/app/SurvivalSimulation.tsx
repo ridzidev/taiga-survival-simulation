@@ -135,6 +135,19 @@ export default function SurvivalSimulation() {
       AIR_NIGHT: "#1e4a7a",
       API: "#ff9500",
     };
+
+    // Load survivor sprite
+    let survivorSprite: HTMLImageElement | null = null;
+    const SPRITE_PATH = "/game_assets/survivor/survivor.png"; // Update this path when you have the new sprite
+    const survivorImg = new Image();
+    survivorImg.onload = () => {
+      survivorSprite = survivorImg;
+      console.log("Survivor sprite loaded successfully");
+    };
+    survivorImg.onerror = () => {
+      console.warn(`Failed to load sprite from ${SPRITE_PATH}, using colored fallback`);
+    };
+    survivorImg.src = SPRITE_PATH;
     let mapSize: number = 60,
       mapHeight: number = 42;
     let grid: string[][] = [];
@@ -998,10 +1011,23 @@ export default function SurvivalSimulation() {
       }
 
       entities.forEach((entity: Entity) => {
-        ctx.fillStyle = entity.type === "API" 
-          ? (Math.random() > 0.5 ? "#ff9500" : "#ffdd59")
-          : COLORS[entity.type] || "#fff";
-        ctx.fillRect(entity.x * TILE_SIZE, entity.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        // Render survivor sprite if available
+        if (entity.type === "SURVIVOR" && survivorSprite) {
+          const spriteWidth = survivorSprite.width || 64;
+          const spriteHeight = survivorSprite.height || 64;
+          const scale = TILE_SIZE / Math.max(spriteWidth, spriteHeight);
+          const displayWidth = spriteWidth * scale;
+          const displayHeight = spriteHeight * scale;
+          const x = entity.x * TILE_SIZE + (TILE_SIZE - displayWidth) / 2;
+          const y = entity.y * TILE_SIZE + (TILE_SIZE - displayHeight) / 2;
+          ctx.drawImage(survivorSprite, x, y, displayWidth, displayHeight);
+        } else {
+          // Fallback to colored squares for other entities
+          ctx.fillStyle = entity.type === "API" 
+            ? (Math.random() > 0.5 ? "#ff9500" : "#ffdd59")
+            : COLORS[entity.type] || "#fff";
+          ctx.fillRect(entity.x * TILE_SIZE, entity.y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        }
       });
     }
 
@@ -1013,58 +1039,31 @@ export default function SurvivalSimulation() {
       shelterCtx.fillRect(0, 0, shelterCanvas.width, shelterCanvas.height);
       
       shelterCtx.fillStyle = "#7d5a3e";
-      const wallThickness = Math.max(15, Math.floor(shelterCanvas.width / 20));
+      const wallThickness = 20;
       shelterCtx.fillRect(0, 0, shelterCanvas.width, wallThickness);
       shelterCtx.fillRect(0, shelterCanvas.height - wallThickness, shelterCanvas.width, wallThickness);
       shelterCtx.fillRect(0, 0, wallThickness, shelterCanvas.height);
       shelterCtx.fillRect(shelterCanvas.width - wallThickness, 0, wallThickness, shelterCanvas.height);
       
-      // Draw fireplace/center area
-      shelterCtx.fillStyle = "#6b4423";
-      const centerSize = Math.max(50, Math.floor(shelterCanvas.width / 8));
-      shelterCtx.fillRect(
-        shelterCanvas.width / 2 - centerSize / 2,
-        shelterCanvas.height / 2 - centerSize / 2,
-        centerSize,
-        centerSize
-      );
-      
-      // Draw survivor
       shelterCtx.fillStyle = "#ff4757";
-      const survivorSize = Math.max(30, Math.floor(shelterCanvas.width / 12)) + 5 * (shelter.level - 1);
+      const survivorSize = 30 + 5 * (shelter.level - 1);
       shelterCtx.fillRect(
         shelterCanvas.width / 2 - survivorSize / 2,
-        shelterCanvas.height / 2 - 40,
+        shelterCanvas.height / 2 - survivorSize / 2,
         survivorSize,
         survivorSize
       );
       
-      // Draw fire if exists
       if (shelter.fire) {
         const flicker = Math.random() > 0.5 ? "#ff9500" : "#ffdd59";
         shelterCtx.fillStyle = flicker;
-        const fireSize = Math.max(25, Math.floor(shelterCanvas.width / 16));
+        const fireSize = 40;
         shelterCtx.fillRect(
-          shelterCanvas.width / 2 - fireSize / 2,
-          shelterCanvas.height / 2 - fireSize / 2,
+          shelterCanvas.width / 2 + 50,
+          shelterCanvas.height / 2,
           fireSize,
           fireSize
         );
-      }
-      
-      // Draw status text
-      shelterCtx.fillStyle = "#e0e0e0";
-      shelterCtx.font = `${Math.max(12, Math.floor(shelterCanvas.width / 50))}px monospace`;
-      shelterCtx.textAlign = "center";
-      shelterCtx.fillText(
-        `Shelter Level ${shelter.level}`,
-        shelterCanvas.width / 2,
-        30
-      );
-      if (shelter.fire) {
-        shelterCtx.fillText("🔥 Warm!", shelterCanvas.width / 2, shelterCanvas.height - 20);
-      } else {
-        shelterCtx.fillText("❄️ Cold", shelterCanvas.width / 2, shelterCanvas.height - 20);
       }
     }
 
