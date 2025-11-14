@@ -378,33 +378,38 @@ export default function SurvivalSimulation() {
       plan: string[];
       planAdvance: boolean;
 
+      // 2. updateAI() – Tambah satu baris biar malam langsung pulang (double protection)
       updateAI() {
         if (this.health <= 0) return;
 
-        // Malam hari + punya shelter = LANGSUNG PULANG, NGGAK USAH NGELUYUR!
-        if (this.hasShelter && !isDay && !inShelter) {
+        // DOUBLE PROTECTION: MALAM + PUNYA SHELTER = LANGSUNG PULANG, NGGAK BOLEH ADA PLAN LAIN
+        if (!isDay && this.hasShelter && !inShelter) {
           this.task = "pulang ke shelter";
           this.performTask();
           return;
         }
 
-        // Plan habis? Buat baru!
+        // Warmth kritis → langsung pulang / bikin api
+        if (this.warmth < 55 && this.hasShelter && !inShelter) {
+          this.task = "pulang ke shelter";
+          this.performTask();
+          return;
+        }
+
+        // Plan kosong? Buat baru
         if (!this.plan || this.plan.length === 0) {
           this.buildPlan();
         }
 
-        // Eksekusi plan
+        // Eksekusi plan normal
         if (this.plan.length > 0) {
           this.task = this.plan[0];
           this.planAdvance = false;
           this.performTask();
-          if (this.planAdvance) {
-            this.plan.shift(); // task selesai → lanjut ke berikutnya
-          }
+          if (this.planAdvance) this.plan.shift();
           return;
         }
 
-        // Fallback santai
         this.task = inShelter ? "istirahat" : "mengembara";
         this.performTask();
       }
@@ -835,15 +840,16 @@ export default function SurvivalSimulation() {
       }
 
       // Build a plan using RESOURCE BALANCE strategy with nearby resource gathering
+      // 1. buildPlan() – VERSI AMAN 2025 (nggak akan keluyuran malam!)
       buildPlan() {
         this.plan = [];
 
-        // === DARURAT: Stat kritis langsung ambil alih ===
-        if (this.thirst < 40) {
+        // ========== DARURAT PALING ATAS (override semua) ==========
+        if (this.thirst < 45) {
           this.plan.push(this.inventory.water > 0 ? "minum" : "ambil air");
           return;
         }
-        if (this.hunger < 40) {
+        if (this.hunger < 45) {
           this.plan.push(
             this.inventory.food > 0
               ? "makan"
@@ -853,7 +859,15 @@ export default function SurvivalSimulation() {
           );
           return;
         }
-        if (this.warmth < 45 && !inShelter) {
+
+        // MALAM HARI + PUNYA SHELTER = PULANG DULU, NGGAK PEDULI APA PUN!
+        if (!isDay && this.hasShelter && !inShelter) {
+          this.plan.push("pulang ke shelter");
+          return;
+        }
+
+        // Kalo warmth udah bahaya → langsung pulang / bikin api, nggak peduli target stok
+        if (this.warmth < 55) {
           if (this.hasShelter) {
             this.plan.push("pulang ke shelter");
           } else if (this.inventory.wood > 0) {
@@ -864,7 +878,7 @@ export default function SurvivalSimulation() {
           return;
         }
 
-        // === BELUM PUNYA SHELTER? Fokus bangun dulu! ===
+        // Belum punya shelter → fokus bangun
         if (!this.hasShelter) {
           if (this.inventory.wood >= 10 && this.inventory.stone >= 5) {
             this.plan.push("bangun shelter");
@@ -876,12 +890,18 @@ export default function SurvivalSimulation() {
           return;
         }
 
-        // === SUDAH PUNYA SHELTER → Stockpile cerdas (terutama musim dingin) ===
+        // SUDAH AMAN DI SHELTER + SIANG HARI → baru boleh stok barang
+        if (!isDay) {
+          // Malam hari cuma boleh istirahat atau bikin api kalo dingin
+          return;
+        }
+
+        // Stok barang cuma dilakukan saat SIANG + warmth aman
         const target = {
-          food: 22,
-          water: 14,
-          wood: season === 3 ? 80 : 35, // musim dingin butuh kayu gila
-          fur: 15,
+          food: 20,
+          water: 12,
+          wood: season === 3 ? 70 : 30,
+          fur: 12,
         };
 
         const deficits = [
@@ -889,51 +909,37 @@ export default function SurvivalSimulation() {
             cur: this.inventory.water,
             tgt: target.water,
             task: "ambil air",
-            prio: 20,
+            prio: 18,
           },
           {
             cur: this.inventory.food,
             tgt: target.food,
             task: this.inventory.fishingrod ? "memancing" : "berburu",
-            prio: 15,
+            prio: 14,
           },
           {
             cur: this.inventory.wood,
             tgt: target.wood,
             task: "mencari kayu",
-            prio: season === 3 ? 30 : 12,
+            prio: season === 3 ? 25 : 10,
           },
           {
             cur: this.inventory.fur,
             tgt: target.fur,
             task: "berburu",
-            prio: 8,
+            prio: 7,
           },
         ];
 
-        // Cari yang paling kurang (weighted)
         let worst = deficits[0];
         for (const d of deficits) {
-          if ((d.tgt - d.cur) * d.prio > (worst.tgt - worst.cur) * worst.prio) {
+          if ((d.tgt - d.cur) * d.prio > (worst.tgt - worst.cur) * worst.prio)
             worst = d;
-          }
         }
 
         this.plan.push(worst.task);
 
-        // Kalau kekurangan parah banget, tambah satu task lagi
-        if (worst.cur < worst.tgt * 0.4) {
-          const second = deficits
-            .filter((d) => d !== worst)
-            .sort(
-              (a, b) => (b.tgt - b.cur) * b.prio - (a.tgt - a.cur) * a.prio
-            )[0];
-          if (second && second.cur < second.tgt * 0.7) {
-            this.plan.push(second.task);
-          }
-        }
-
-        // === Crafting & upgrade otomatis kalau resource udah aman ===
+        // Crafting otomatis kalo stok udah aman
         if (
           !this.inventory.fishingrod &&
           this.inventory.thread >= 2 &&
